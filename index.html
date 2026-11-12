@@ -626,7 +626,7 @@ $("fileExp").onclick=async()=>{const t=JSON.stringify(S),name="dienstplan-"+mk(Y
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);};
 $("fileImp").onchange=(ev)=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.emps))throw 0;S=Object.assign(defaults(),d);S.sample=false;S.teamOffered=true;S.menSet=true;S.fixSet=true;save();render();toast("Datei geladen");}catch(e){toast("Die Datei ist keine gültige Sicherung");}ev.target.value="";};r.readAsText(f);};
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+if("serviceWorker" in navigator){const had=!!navigator.serviceWorker.controller;navigator.serviceWorker.register("sw.js").catch(()=>{});navigator.serviceWorker.addEventListener("controllerchange",()=>{if(had){save();location.reload();}});}
 
 load();render();
 })();
