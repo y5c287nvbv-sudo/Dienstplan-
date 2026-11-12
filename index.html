@@ -143,6 +143,37 @@ label.inl input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)
 textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.75rem}
 .confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 @media (max-width:600px){.plan th.name{min-width:70px;max-width:84px;padding:3px 6px;font-size:.78rem}.plan th.name small{font-size:.62rem}.gridbox{max-height:58vh}}
+
+/* Papieransicht wie der alte Ausdruck */
+body.paper .plan td.c{background:var(--surface);color:var(--fg);height:30px;min-width:30px;font-weight:600}
+body.paper .plan td.c.we{background:var(--we)} body.paper .plan td.c.hol{background:var(--hol)}
+body.paper .plan td.c.Ug,body.paper .plan td.c.U,body.paper .plan td.c.WB,body.paper .plan td.c.KM,body.paper .plan td.c.ZU{background:var(--abs);color:var(--abs-fg)}
+body.paper .plan td.c.Nc{background:var(--surface);color:var(--fg)}
+body.paper .plan td.c.auto{font-weight:400}
+body.paper .plan .mon{border-left:2px solid var(--line-strong)}
+body.paper .plan th.name small{display:none}
+body.paper .plan th.name.off,body.paper .plan tr.off th.name{text-decoration:line-through}
+body.paper .plan thead th{min-width:30px}
+#printSheet{display:none}
+@media print{
+  @page{size:A4 landscape;margin:7mm}
+  :root,html,body{background:#fff!important;color:#000!important;padding:0!important;height:auto!important;min-height:0!important}
+  body::before,header.top,main,.palette,nav.tabs,.toast{display:none!important}
+  #printSheet{display:block!important;font-family:"Courier New",Courier,monospace;color:#000}
+  .ps-head{display:flex;justify-content:space-between;font-size:11pt;margin:0 0 2mm}
+  .ps-head b{font-weight:400;letter-spacing:.04em}
+  table.ps{border-collapse:collapse;width:100%;table-layout:fixed;font-size:7.5pt}
+  .ps th,.ps td{border:0.5pt solid #555;text-align:center;padding:0;height:5.2mm;overflow:hidden;white-space:nowrap}
+  .ps th.n,.ps td.n{width:27mm;text-align:left;padding-left:1mm;font-weight:400}
+  .ps th.h{width:11mm}
+  .ps .we{background:#e6e6e6!important} .ps .hol{background:#d9d9d9!important}
+  .ps .grey{background:#bdbdbd!important}
+  .ps .mon{border-left:1.6pt solid #000}
+  .ps tr.off td.n{text-decoration:line-through}
+  .ps tfoot td{font-size:6.5pt;height:4mm}
+  .ps-foot{display:flex;justify-content:space-between;font-size:7pt;margin-top:2mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(130px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.88rem;z-index:40;max-width:90vw}
 @media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
 </style>
@@ -171,6 +202,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.75rem}
         <button class="btn primary" id="nightBtn">1. Nächte verteilen</button>
         <button class="btn primary" id="autoBtn">2. Restliche Dienste planen</button>
         <button class="btn" id="clearAutoBtn">Vorschlag löschen</button>
+        <button class="btn" id="printBtn">Drucken / PDF</button>
+        <button class="btn" id="viewBtn">Farbig anzeigen</button>
       </div>
     </div>
     <div class="gridbox" id="gridbox"></div>
@@ -245,6 +278,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.75rem}
   <div class="hint" id="palHint">Kürzel wählen, dann Felder antippen. Nochmal tippen löscht.</div>
 </div>
 
+<div id="printSheet" aria-hidden="true"></div>
 <nav class="tabs" aria-label="Bereiche">
   <button data-v="plan" aria-current="page">Plan</button>
   <button data-v="team">Team</button>
@@ -265,12 +299,12 @@ const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
 const LAENDER={"":"nur bundesweit",BW:"Baden-Württemberg",BY:"Bayern",BE:"Berlin",BB:"Brandenburg",HB:"Bremen",HH:"Hamburg",HE:"Hessen",MV:"Mecklenburg-Vorpommern",NI:"Niedersachsen",NW:"Nordrhein-Westfalen",RP:"Rheinland-Pfalz",SL:"Saarland",SN:"Sachsen",ST:"Sachsen-Anhalt",SH:"Schleswig-Holstein",TH:"Thüringen"};
 
 function defaults(){return{
-  settings:{minFd:3,se:2,sb:1,manFd:true,manLate:true,minRest:11,maxConsec:6,freeAfterNight:2,nightBlockMax:3,maxWishes:2,land:"SN"},
+  settings:{minFd:3,se:2,sb:1,manFd:true,manLate:true,minRest:11,maxConsec:6,freeAfterNight:2,nightBlockMax:3,maxWishes:2,land:"SN",paper:true,station:"KFP B1"},
   shifts:{Fd:{s:"06:30",e:"15:00",h:8},Se:{s:"14:30",e:"23:00",h:8},Sb:{s:"12:30",e:"21:00",h:8},Nc:{s:"22:30",e:"07:00",h:8}},
   emps:[],months:{},sample:false};}
 
 let S;
-function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(defaults(),JSON.parse(raw));if(!S.sample&&!S.menSet){S.emps.forEach(e=>{if(MEN.includes(e.name))e.male=true;});S.menSet=true;}const n=S.shifts.Nc;if(n&&n.s==="21:30"&&n.e==="06:30"){S.shifts.Nc={s:"22:30",e:"07:00",h:8};}if(!S.settings.land)S.settings.land="SN";if(S.shifts.Se&&S.shifts.Se.s==="15:00")S.shifts.Se.s="14:30";if(S.shifts.Nc&&S.shifts.Nc.h===8.5)S.shifts.Nc.h=8;const f=S.shifts.Fd;if(f&&f.s==="06:00"&&f.e==="14:00"){f.s="06:30";f.e="15:00";}return;}}catch(e){}S=defaults();S.teamOffered=true;S.menSet=true;S.fixSet=true;}
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(defaults(),JSON.parse(raw));S.settings=Object.assign(defaults().settings,S.settings);if(!S.sample&&!S.menSet){S.emps.forEach(e=>{if(MEN.includes(e.name))e.male=true;});S.menSet=true;}const n=S.shifts.Nc;if(n&&n.s==="21:30"&&n.e==="06:30"){S.shifts.Nc={s:"22:30",e:"07:00",h:8};}if(!S.settings.land)S.settings.land="SN";if(S.shifts.Se&&S.shifts.Se.s==="15:00")S.shifts.Se.s="14:30";if(S.shifts.Nc&&S.shifts.Nc.h===8.5)S.shifts.Nc.h=8;const f=S.shifts.Fd;if(f&&f.s==="06:00"&&f.e==="14:00"){f.s="06:30";f.e="15:00";}return;}}catch(e){}S=defaults();S.teamOffered=true;S.menSet=true;S.fixSet=true;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 const now=new Date();let Y=now.getFullYear(),M=now.getMonth()+2;if(M>12){M=1;Y++;}
 const mk=(y,m)=>y+"-"+String(m).padStart(2,"0");
@@ -433,12 +467,12 @@ function render(){
   const r=check();
   $("status").innerHTML=(r.err?`<span class="pill err">${r.err} Fehler</span>`:`<span class="pill ok">Besetzung ok</span>`)+(r.warn?`<span class="pill warn">${r.warn} Hinweise</span>`:"");
   $("sampleNote").hidden=!S.sample;
-  renderGrid();renderIssues(r);renderPalette();renderNightInfo();
+  document.body.classList.toggle("paper",S.settings.paper!==false);$("viewBtn").textContent=S.settings.paper!==false?"Farbig anzeigen":"Wie Papier anzeigen";renderGrid();renderIssues(r);renderPalette();renderNightInfo();
   if(view==="team")renderTeam();if(view==="month")renderMonth();if(view==="rules")renderRules();
 }
 function renderGrid(){
   const N=dim(Y,M);let h='<table class="plan"><thead><tr><th class="name">'+esc(MON[M-1].slice(0,3))+'</th>';
-  const cls=(d)=>{const w=wday(Y,M,d);return holName(d)?"hol":(w===0||w===6?"we":"");};
+  const cls=(d)=>{const w=wday(Y,M,d);return (holName(d)?"hol":(w===0||w===6?"we":""))+(w===1?" mon":"");};
   for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}" title="${esc(holName(d)||"")}">${d}<span class="wd">${WD[wday(Y,M,d)]}</span></th>`;
   h+='<th class="sum">Ist / Soll</th></tr></thead><tbody>';
   S.emps.forEach(e=>{
@@ -459,6 +493,21 @@ function renderGrid(){
   h+=`<tr><th class="name">Mann F/S</th>`;for(let d=1;d<=N;d++){const a=men(d,["Fd"]),b=men(d,["Se"]);const bad=(S.settings.manFd&&a===0)||(S.settings.manLate&&b===0);h+=`<td class="${bad?"bad":"good"}">${a}/${b}</td>`;}h+='<td></td></tr>';
   h+='</tfoot></table>';
   const box=$("gridbox"),sl=box.scrollLeft,stp=box.scrollTop;box.innerHTML=h;box.scrollLeft=sl;box.scrollTop=stp;
+}
+function renderPrint(){
+  const N=dim(Y,M),st=S.settings,pad=(n)=>String(n).padStart(2,"0"),W3=["Son","Mon","Die","Mit","Don","Fre","Sam"];
+  const cls=(d)=>{const w=wday(Y,M,d);return (holName(d)?"hol":(w===0||w===6?"we":""))+(w===1?" mon":"");};
+  const t=new Date(),today=`${pad(t.getDate())}.${pad(t.getMonth()+1)}.${t.getFullYear()}`;
+  let h=`<div class="ps-head"><b>Dienstplan</b><b>${esc(st.station||"")} 01.${pad(M)}.${Y}-${N}.${pad(M)}.${Y}</b><b>Datum:${today}</b></div><table class="ps"><thead><tr><th class="n">${MON[M-1]} ${Y}</th>`;
+  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${d}</th>`;h+='<th class="h">Std.</th></tr><tr><th class="n"></th>';
+  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${W3[wday(Y,M,d)]}</th>`;h+='<th class="h">Soll</th></tr></thead><tbody>';
+  S.emps.forEach(e=>{const off=!plannable(e);h+=`<tr class="${off?"off":""}"><td class="n">${esc(e.name)}</td>`;
+    for(let d=1;d<=N;d++){const c=code(e.id,d)||"";const g=ABS.includes(c)||c==="/";h+=`<td class="${cls(d)}${g?" grey":""}">${esc(c)}</td>`;}
+    h+=`<td class="h">${off?"":fmt(istH(e))+"/"+fmt(sollH(e))}</td></tr>`;});
+  h+='</tbody><tfoot>';
+  [["Fd","Früh"],["Se","Spät"],["Sb","Spät B"],["Nc","Nacht"]].forEach(([c,l])=>{h+=`<tr><td class="n">${l}</td>`;for(let d=1;d<=N;d++)h+=`<td class="${cls(d)}">${count(d,c)}</td>`;h+='<td></td></tr>';});
+  h+=`</tfoot></table><div class="ps-foot"><span>Fd 6:30–15:00 · Se 14:30–23:00 · Sb 12:30–21:00 · Nc 22:30–7:00 · Ug Urlaub · KM krank · WB Weiterbildung · ZU Zusatztag · / frei</span><span>Seite 1</span></div>`;
+  $("printSheet").innerHTML=h;
 }
 function renderNightInfo(){
   const mo=mon(Y,M),N=dim(Y,M);let days=0,tot=0,have=0;for(let d=1;d<=N;d++){const n=+mo.nights[d]||0;if(n){days++;tot+=n;have+=Math.min(n,count(d,"Nc"));}}
@@ -508,7 +557,7 @@ function renderRules(){
   const num=(k,l,min,max,step)=>`<label>${l}<input type="number" data-r="${k}" value="${st[k]}" min="${min}" max="${max}" step="${step||1}"></label>`;
   const chk=(k,l)=>`<label>${l}<input type="checkbox" data-r="${k}" ${st[k]?"checked":""} style="width:20px;height:20px;accent-color:var(--accent)"></label>`;
   $("rulesForm").innerHTML=num("minFd","Frühdienst mindestens",1,15)+num("se","Spätdienst Se genau",0,6)+num("sb","Spätdienst Sb genau",0,6)+chk("manFd","Mann im Frühdienst")+chk("manLate","Mann im Spätdienst (Se)")+num("minRest","Ruhezeit mindestens (h)",8,14,.5)+num("maxConsec","Tage am Stück höchstens",3,12)+num("freeAfterNight","Freie Tage nach Nachtblock",1,4)+num("nightBlockMax","Nächte am Stück höchstens",1,7)+num("maxWishes","Wünsche pro Person",0,10)+
-    `<label>Bundesland (Feiertage)<select data-r="land">${Object.entries(LAENDER).map(([k,v])=>`<option value="${k}" ${st.land===k?"selected":""}>${v}</option>`).join("")}</select></label>`;
+    `<label>Station (für den Ausdruck)<input type="text" data-r="station" value="${esc(st.station||"")}" style="width:7em"></label>`+`<label>Bundesland (Feiertage)<select data-r="land">${Object.entries(LAENDER).map(([k,v])=>`<option value="${k}" ${st.land===k?"selected":""}>${v}</option>`).join("")}</select></label>`;
   $("shiftForm").innerHTML=WORK.map(c=>{const s=S.shifts[c];return`<label><b style="font-family:var(--f-mono)">${c}</b><span style="display:flex;gap:4px;align-items:center"><input type="time" data-sh="${c}.s" value="${s.s}"> – <input type="time" data-sh="${c}.e" value="${s.e}"> <input type="number" data-sh="${c}.h" value="${s.h}" step="0.25" style="width:4.2em" aria-label="Stunden"> h</span></label>`;}).join("");
   $("wipeConfirm").innerHTML=wipeAsk?`<div class="confirm"><span>Wirklich Team und alle Pläne auf diesem Gerät löschen?</span><button class="btn small danger" id="wipeYes">Ja, alles löschen</button><button class="btn small" id="wipeNo">Abbrechen</button></div>`:"";
 }
@@ -517,7 +566,7 @@ let tt;function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;cl
 // Ereignisse
 $("prevM").onclick=()=>{M--;if(M<1){M=12;Y--;}render();};
 $("nextM").onclick=()=>{M++;if(M>12){M=1;Y++;}render();};
-$("autoBtn").onclick=autoRest;$("nightBtn").onclick=autoNights;$("goNights").onclick=()=>document.querySelector('nav.tabs button[data-v="month"]').click();
+$("autoBtn").onclick=autoRest;$("viewBtn").onclick=()=>{S.settings.paper=S.settings.paper===false;save();render();};$("printBtn").onclick=()=>{renderPrint();try{window.print();}catch(e){}setTimeout(()=>toast("Falls kein Druckfenster kommt: In Safari öffnen und dort drucken"),800);};$("nightBtn").onclick=autoNights;$("goNights").onclick=()=>document.querySelector('nav.tabs button[data-v="month"]').click();
 $("clearAutoBtn").onclick=()=>{clearAuto();save();render();toast("Vorschlag gelöscht, deine Einträge bleiben");};
 document.querySelector("nav.tabs").onclick=(ev)=>{const b=ev.target.closest("button");if(!b)return;view=b.dataset.v;
   document.querySelectorAll("nav.tabs button").forEach(x=>x.toggleAttribute("aria-current",x===b));document.querySelectorAll("nav.tabs button[aria-current]").forEach(x=>x.setAttribute("aria-current","page"));
