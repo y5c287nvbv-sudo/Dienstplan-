@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dienstplan">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Dienstplan Station</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: App-Rahmen mit Kopfzeile, scrollbarem Monatsraster wie der Papierplan, Kürzel-Palette und Navigation unten */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --line:#d5dbe1; --line-strong:#9aa6b2;
+  --fg:#18222c; --muted:#5d6b78; --accent:#1f5f8b; --accent-fg:#ffffff;
+  --we:#e8edf2; --hol:#f6e7d6;
+  --fd:#fff3c4; --fd-fg:#5a4500; --se:#d6e8ff; --se-fg:#123d6b; --sb:#e7dcff; --sb-fg:#3c2577;
+  --nc:#22324a; --nc-fg:#e9eef6; --abs:#e4e7ea; --abs-fg:#46525e; --free:#f1f3f5;
+  --err:#b42318; --err-bg:#fde8e6; --warn:#9a5b00; --warn-bg:#fff1d6; --ok:#16794c; --ok-bg:#e1f4ea;
+  --f-text:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161c; --surface:#19212a; --line:#2c3743; --line-strong:#4b5967;
+  --fg:#e6ebf0; --muted:#9aa7b4; --accent:#6fb0de; --accent-fg:#0d1720;
+  --we:#1f2832; --hol:#3a2c1c;
+  --fd:#4a3d0f; --fd-fg:#ffe7a0; --se:#173452; --se-fg:#cfe3ff; --sb:#2f2550; --sb-fg:#e0d4ff;
+  --nc:#0a0f18; --nc-fg:#c9d6ea; --abs:#2a323b; --abs-fg:#c2ccd6; --free:#1d252e;
+  --err:#ff8a80; --err-bg:#3d1714; --warn:#ffc266; --warn-bg:#3a2a0e; --ok:#6fdca6; --ok-bg:#12321f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161c; --surface:#19212a; --line:#2c3743; --line-strong:#4b5967;
+  --fg:#e6ebf0; --muted:#9aa7b4; --accent:#6fb0de; --accent-fg:#0d1720;
+  --we:#1f2832; --hol:#3a2c1c;
+  --fd:#4a3d0f; --fd-fg:#ffe7a0; --se:#173452; --se-fg:#cfe3ff; --sb:#2f2550; --sb-fg:#e0d4ff;
+  --nc:#0a0f18; --nc-fg:#c9d6ea; --abs:#2a323b; --abs-fg:#c2ccd6; --free:#1d252e;
+  --err:#ff8a80; --err-bg:#3d1714; --warn:#ffc266; --warn-bg:#3a2a0e; --ok:#6fdca6; --ok-bg:#12321f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-text);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);padding-block:10px}
+.top-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.month{display:flex;align-items:center;gap:6px}
+.month h1{font-size:1.15rem;margin:0;min-width:9.5em;text-align:center;font-weight:600;letter-spacing:.01em}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:36px;height:36px;font-size:1.1rem;line-height:1}
+.status{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:.78rem;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.err{background:var(--err-bg);color:var(--err)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.ok{background:var(--ok-bg);color:var(--ok)}
+
+main{padding-block:14px 170px}
+.view[hidden]{display:none}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.btn{border:1px solid var(--line-strong);background:var(--surface);padding:8px 14px;border-radius:8px;font-weight:500}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.btn.small{padding:5px 10px;font-size:.85rem}
+.note{color:var(--muted);font-size:.85rem;margin:0}
+.sample{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:.85rem;margin-bottom:12px}
+
+/* Raster */
+.gridbox{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-height:62vh;-webkit-overflow-scrolling:touch}
+table.plan{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;font-family:var(--f-mono);font-size:.8rem}
+.plan th,.plan td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:0;text-align:center}
+.plan thead th{position:sticky;top:0;background:var(--surface);z-index:3;font-weight:600;padding:4px 0;min-width:34px}
+.plan thead th .wd{display:block;font-weight:400;color:var(--muted);font-size:.68rem}
+.plan th.name{position:sticky;left:0;z-index:4;background:var(--surface);text-align:left;padding:4px 8px;min-width:96px;max-width:120px;font-family:var(--f-text);font-size:.82rem}
+.plan thead th.name{z-index:5}
+.plan th.name small{display:block;color:var(--muted);font-weight:400;font-size:.7rem;font-family:var(--f-mono)}
+.plan th.name.off{color:var(--muted)}
+.plan .we{background:var(--we)} .plan thead th.we{background:var(--we)} .plan .hol{background:var(--hol)} .plan thead th.hol{background:var(--hol)}
+.plan td.c{height:38px;min-width:34px;position:relative;cursor:pointer;font-weight:600}
+.plan td.c.Fd{background:var(--fd);color:var(--fd-fg)} .plan td.c.Se{background:var(--se);color:var(--se-fg)}
+.plan td.c.Sb{background:var(--sb);color:var(--sb-fg)} .plan td.c.Nc{background:var(--nc);color:var(--nc-fg)}
+.plan td.c.U,.plan td.c.Ug,.plan td.c.WB,.plan td.c.KM,.plan td.c.K,.plan td.c.ZU{background:var(--abs);color:var(--abs-fg)}
+.plan td.c.frei{background:var(--free);color:var(--muted)}
+.plan td.c.auto{font-weight:400}
+.plan td.c.wish::after{content:"W";position:absolute;right:2px;top:1px;font-size:.55rem;color:var(--accent);font-weight:700}
+.plan td.c.wish{box-shadow:inset 0 0 0 2px var(--accent)}
+.plan td.c.bad{box-shadow:inset 0 0 0 2px var(--err)}
+.plan td.c.bad.wish{box-shadow:inset 0 0 0 2px var(--err)}
+.plan tr.off td.c{background-image:repeating-linear-gradient(135deg,transparent 0 6px,var(--line) 6px 7px)}
+.plan td.sum,.plan th.sum{font-size:.72rem;padding:2px 4px;white-space:nowrap}
+.plan tfoot th,.plan tfoot td{background:var(--surface);font-size:.75rem;height:26px}
+.plan tfoot td.bad{background:var(--err-bg);color:var(--err);font-weight:700}
+.plan tfoot td.good{color:var(--ok)}
+.plan td.hrs{min-width:74px;font-size:.72rem;padding:0 6px;white-space:nowrap}
+.plan td.hrs.over{color:var(--warn)} .plan td.hrs.under{color:var(--err)}
+
+/* Palette */
+.palette{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-block:8px}
+.palette .row{display:flex;gap:6px;overflow-x:auto;align-items:center;padding-bottom:2px}
+.chip{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:6px 10px;font-family:var(--f-mono);font-weight:600;font-size:.85rem;white-space:nowrap;flex:0 0 auto}
+.chip[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:1px}
+.chip.Fd{background:var(--fd);color:var(--fd-fg)} .chip.Se{background:var(--se);color:var(--se-fg)} .chip.Sb{background:var(--sb);color:var(--sb-fg)}
+.chip.Nc{background:var(--nc);color:var(--nc-fg)} .chip.abs{background:var(--abs);color:var(--abs-fg)}
+.toggle{display:flex;align-items:center;gap:6px;font-size:.85rem;white-space:nowrap;flex:0 0 auto;padding-right:6px;border-right:1px solid var(--line);margin-right:2px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.hint{font-size:.78rem;color:var(--muted);margin-top:4px}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:16;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs button{border:0;background:none;height:58px;font-size:.85rem;font-weight:500;color:var(--muted);border-top:3px solid transparent}
+nav.tabs button[aria-current="page"]{color:var(--accent);border-top-color:var(--accent)}
+
+/* Prüfliste */
+.issues{margin-top:16px;display:grid;gap:6px}
+.issues h2,.card h2{font-size:1rem;margin:0 0 6px}
+.issue{display:flex;gap:8px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:6px;padding:7px 10px;font-size:.88rem}
+.issue.err{border-left-color:var(--err)}
+.issue b{font-family:var(--f-mono);font-size:.8rem;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:var(--muted);margin-top:12px}
+.legend span b{font-family:var(--f-mono);color:var(--fg)}
+
+/* Karten / Formulare */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.emp{display:grid;grid-template-columns:1fr;gap:8px;border-bottom:1px solid var(--line);padding-block:10px}
+.emp:last-child{border-bottom:0}
+.emp .r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.emp input[type=text]{width:7.5em}
+input[type=text],input[type=number],select,textarea{border:1px solid var(--line-strong);background:var(--bg);border-radius:6px;padding:6px 8px}
+input[type=number]{width:5em}
+label.inl{display:flex;align-items:center;gap:5px;font-size:.88rem}
+label.inl input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 16px}
+.form label{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.9rem}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:420px}
+.cal .h{font-size:.72rem;color:var(--muted);text-align:center}
+.cal button{border:1px solid var(--line);background:var(--surface);border-radius:6px;height:46px;font-family:var(--f-mono);font-size:.8rem;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.cal button.n1{background:var(--se);color:var(--se-fg)} .cal button.n2,.cal button.n3,.cal button.n4{background:var(--nc);color:var(--nc-fg)}
+.cal button small{font-size:.68rem;opacity:.85}
+textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.75rem}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+@media (max-width:600px){.plan th.name{min-width:70px;max-width:84px;padding:3px 6px;font-size:.78rem}.plan th.name small{font-size:.62rem}.gridbox{max-height:58vh}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(130px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.88rem;z-index:40;max-width:90vw}
+@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
+</style>
+</head>
+<body>
+
+
+<header class="top wrap">
+  <div class="top-row">
+    <div class="month">
+      <button class="iconbtn" id="prevM" aria-label="Vorheriger Monat">‹</button>
+      <h1 id="mTitle">–</h1>
+      <button class="iconbtn" id="nextM" aria-label="Nächster Monat">›</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="view" id="v-plan">
+    <div class="sample" id="sampleNote" hidden>Beispieldaten: Team und Einträge sind erfunden. Unter „Regeln“ kannst du alles löschen und dein Team anlegen.</div>
+    <div class="card steps">
+      <p class="note" id="nightInfo"></p>
+      <div class="bar" style="margin:8px 0 0">
+        <button class="btn" id="goNights">Nächte eintragen</button>
+        <button class="btn primary" id="nightBtn">1. Nächte verteilen</button>
+        <button class="btn primary" id="autoBtn">2. Restliche Dienste planen</button>
+        <button class="btn" id="clearAutoBtn">Vorschlag löschen</button>
+      </div>
+    </div>
+    <div class="gridbox" id="gridbox"></div>
+    <div class="legend">
+      <span><b>Fd</b> Früh</span><span><b>Se</b> Spät</span><span><b>Sb</b> Spät B</span><span><b>Nc</b> Nacht</span>
+      <span><b>Ug</b> Urlaub</span><span><b>KM</b> krank mit Schein</span><span><b>WB</b> Weiterbildung</span><span><b>ZU</b> Zusatztag</span><span><b>/</b> frei</span>
+      <span>Fett = von dir eingetragen, dünn = Vorschlag, Rahmen mit W = Wunsch, schraffiert = wird nicht verplant</span>
+    </div>
+    <div class="issues" id="issues"></div>
+  </section>
+
+  <section class="view" id="v-team" hidden>
+    <div class="card">
+      <h2>Team</h2>
+      <p class="note">Nur Kürzel oder Pseudonyme eintragen, keine Klarnamen. „Mann“ wird für die Regel „mindestens ein Mann im Früh- und Spätdienst“ gebraucht.</p>
+      <div id="empList"></div>
+      <div class="bar" style="margin-top:10px"><button class="btn" id="addEmp">Mitarbeiter hinzufügen</button></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-month" hidden>
+    <div class="card">
+      <h2>Nachtdienste B1 (Absprache mit B2)</h2>
+      <p class="note">Tippe einen Tag an, um die Anzahl Nachtdienste für eure Station zu ändern (0 → 1 → 2 → 0).</p>
+      <div class="cal" id="nightCal" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>Soll für diesen Monat</h2>
+      <p class="note">Leer lassen, dann rechnet die App selbst nach TVöD-K: Montag bis Freitag × Wochenstunden ÷ 5, minus ein Fünftel für jeden Feiertag sowie 24. und 31.12., die auf Montag bis Samstag fallen. Urlaub, WB und Krank zählen an Werktagen als Stunden. Wenn du Soll-Dienste einträgst, plant die Automatik nach Dienstanzahl.</p>
+      <div id="sollList" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-rules" hidden>
+    <div class="card">
+      <h2>Besetzung pro Tag</h2>
+      <div class="form" id="rulesForm"></div>
+    </div>
+    <div class="card">
+      <h2>Dienstzeiten</h2>
+      <div class="form" id="shiftForm"></div>
+      <p class="note" style="margin-top:8px">Stunden = was dem Konto gutgeschrieben wird (Dienst minus 30 Minuten Pause).</p>
+    </div>
+    <div class="card">
+      <h2>Sichern und übertragen</h2>
+      <p class="note">Die Daten liegen nur auf diesem Gerät. „Als Datei sichern / teilen“ erzeugt eine Datei, die du per AirDrop, Mail oder in „Dateien“ weitergeben kannst. Auf dem anderen Gerät „Datei laden“ tippen. Bitte regelmäßig sichern.</p>
+      <div class="bar" style="margin-top:8px">
+        <button class="btn" id="exportBtn">Sicherung kopieren</button>
+        <button class="btn" id="importBtn">Laden</button>
+      </div>
+      <div class="bar">
+        <button class="btn primary" id="fileExp">Als Datei sichern / teilen</button>
+        <label class="btn" for="fileImp" style="display:inline-flex;align-items:center">Datei laden</label>
+        <input type="file" id="fileImp" accept=".json,application/json,text/plain" hidden>
+      </div>
+      <textarea id="io" aria-label="Sicherungstext"></textarea>
+    </div>
+    <div class="card">
+      <h2>Neu anfangen</h2>
+      <div class="bar">
+        <button class="btn danger" id="wipeBtn">Alles löschen</button>
+        
+        <button class="btn" id="demoBtn">Beispieldaten laden</button>
+      </div>
+      <div id="wipeConfirm"></div>
+    </div>
+  </section>
+</main>
+
+<div class="palette wrap" id="palette">
+  <div class="row" id="palRow"></div>
+  <div class="hint" id="palHint">Kürzel wählen, dann Felder antippen. Nochmal tippen löscht.</div>
+</div>
+
+<nav class="tabs" aria-label="Bereiche">
+  <button data-v="plan" aria-current="page">Plan</button>
+  <button data-v="team">Team</button>
+  <button data-v="month">Monat</button>
+  <button data-v="rules">Regeln</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const KEY="dienstplan.v1";
+const WORK=["Fd","Se","Sb","Nc"];
+const ABS=["Ug","U","WB","KM","ZU"];/* U nur noch für alte Einträge */
+const WISHABLE=["Fd","Se","Sb","Nc","/"];
+const MON=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
+const LAENDER={"":"nur bundesweit",BW:"Baden-Württemberg",BY:"Bayern",BE:"Berlin",BB:"Brandenburg",HB:"Bremen",HH:"Hamburg",HE:"Hessen",MV:"Mecklenburg-Vorpommern",NI:"Niedersachsen",NW:"Nordrhein-Westfalen",RP:"Rheinland-Pfalz",SL:"Saarland",SN:"Sachsen",ST:"Sachsen-Anhalt",SH:"Schleswig-Holstein",TH:"Thüringen"};
+
+function defaults(){return{
+  settings:{minFd:3,se:2,sb:1,manFd:true,manLate:true,minRest:11,maxConsec:6,freeAfterNight:2,nightBlockMax:3,maxWishes:2,land:"SN"},
+  shifts:{Fd:{s:"06:30",e:"15:00",h:8},Se:{s:"14:30",e:"23:00",h:8},Sb:{s:"12:30",e:"21:00",h:8},Nc:{s:"22:30",e:"07:00",h:8}},
+  emps:[],months:{},sample:false};}
+
+let S;
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(defaults(),JSON.parse(raw));if(!S.sample&&!S.menSet){S.emps.forEach(e=>{if(MEN.includes(e.name))e.male=true;});S.menSet=true;}const n=S.shifts.Nc;if(n&&n.s==="21:30"&&n.e==="06:30"){S.shifts.Nc={s:"22:30",e:"07:00",h:8};}if(!S.settings.land)S.settings.land="SN";if(S.shifts.Se&&S.shifts.Se.s==="15:00")S.shifts.Se.s="14:30";if(S.shifts.Nc&&S.shifts.Nc.h===8.5)S.shifts.Nc.h=8;const f=S.shifts.Fd;if(f&&f.s==="06:00"&&f.e==="14:00"){f.s="06:30";f.e="15:00";}return;}}catch(e){}S=defaults();S.teamOffered=true;S.menSet=true;S.fixSet=true;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+const now=new Date();let Y=now.getFullYear(),M=now.getMonth()+2;if(M>12){M=1;Y++;}
+const mk=(y,m)=>y+"-"+String(m).padStart(2,"0");
+const dim=(y,m)=>new Date(y,m,0).getDate();
+const wday=(y,m,d)=>new Date(y,m-1,d).getDay();
+function mon(y,m){const k=mk(y,m);if(!S.months[k])S.months[k]={cells:{},nights:{},soll:{}};return S.months[k];}
+function norm(y,m,d){const t=new Date(y,m-1,d);return[t.getFullYear(),t.getMonth()+1,t.getDate()];}
+function cellAt(id,y,m,d){const[a,b,c]=norm(y,m,d);const mo=S.months[mk(a,b)];return mo&&mo.cells[id]?mo.cells[id][c]||null:null;}
+function code(id,d){const c=cellAt(id,Y,M,d);return c?c.c:null;}
+function setCell(id,d,val){const mo=mon(Y,M);if(!mo.cells[id])mo.cells[id]={};if(val)mo.cells[id][d]=val;else delete mo.cells[id][d];}
+const isWork=c=>WORK.includes(c);
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+// Feiertage
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
+function holidays(y){const L=S.settings.land,E=easter(y),o=(n)=>{const t=new Date(E);t.setDate(t.getDate()+n);return t;};
+  const list=[[new Date(y,0,1),"Neujahr"],[o(-2),"Karfreitag"],[o(1),"Ostermontag"],[new Date(y,4,1),"1. Mai"],[o(39),"Himmelfahrt"],[o(50),"Pfingstmontag"],[new Date(y,9,3),"Tag der Einheit"],[new Date(y,11,24),"Heiligabend (Soll wie Feiertag)"],[new Date(y,11,25),"1. Weihnachtstag"],[new Date(y,11,26),"2. Weihnachtstag"],[new Date(y,11,31),"Silvester (Soll wie Feiertag)"]];
+  const has=(arr)=>arr.includes(L);
+  if(has(["BW","BY","ST"]))list.push([new Date(y,0,6),"Hl. Drei Könige"]);
+  if(has(["BE","MV"]))list.push([new Date(y,2,8),"Frauentag"]);
+  if(has(["BW","BY","HE","NW","RP","SL"]))list.push([o(60),"Fronleichnam"]);
+  if(has(["SL"]))list.push([new Date(y,7,15),"Mariä Himmelfahrt"]);
+  if(has(["TH"]))list.push([new Date(y,8,20),"Weltkindertag"]);
+  if(has(["BB","HB","HH","MV","NI","SN","ST","SH","TH"]))list.push([new Date(y,9,31),"Reformationstag"]);
+  if(has(["BW","BY","NW","RP","SL"]))list.push([new Date(y,10,1),"Allerheiligen"]);
+  if(has(["SN"])){const t=new Date(y,10,22);while(t.getDay()!==3)t.setDate(t.getDate()-1);list.push([t,"Buß- und Bettag"]);}
+  const map={};list.forEach(([t,n])=>{map[mk(t.getFullYear(),t.getMonth()+1)+"-"+t.getDate()]=n;});return map;}
+let HOL={};
+const holName=(d)=>HOL[mk(Y,M)+"-"+d];
+const isWorkday=(d)=>{const w=wday(Y,M,d);return w>0&&w<6&&!holName(d);};
+
+// Zeiten
+const hh=(t)=>{const[a,b]=t.split(":").map(Number);return a+b/60;};
+function span(c){const s=S.shifts[c];let a=hh(s.s),b=hh(s.e);if(b<=a)b+=24;return[a,b];}
+function restOK(prev,next){if(!isWork(prev)||!isWork(next))return true;return 24+span(next)[0]-span(prev)[1]>=S.settings.minRest;}
+function plannable(e){if(e.plan!=="nein")return true;if(e.until&&mk(Y,M)>e.until)return true;return false;}
+const active=()=>S.emps.filter(plannable);
+function credit(e,d,c){if(isWork(c))return S.shifts[c].h;if(ABS.includes(c))return isWorkday(d)?e.weekly/5:0;return 0;}
+function sollH(e){const o=mon(Y,M).soll[e.id]||{};if(o.h!==undefined&&o.h!=="")return +o.h;let n=0;for(let d=1;d<=dim(Y,M);d++){const w=wday(Y,M,d);if(w>0&&w<6)n++;if(holName(d)&&w>0)n--;}return Math.round(n*e.weekly/5*10)/10;}
+function sollD(e){const o=mon(Y,M).soll[e.id]||{};return(o.d!==undefined&&o.d!=="")?+o.d:null;}
+function istH(e){let h=0;for(let d=1;d<=dim(Y,M);d++){const c=code(e.id,d);if(c)h+=credit(e,d,c);}return Math.round(h*10)/10;}
+function istD(e){let n=0;for(let d=1;d<=dim(Y,M);d++)if(isWork(code(e.id,d)))n++;return n;}
+function zuCount(e,y){let n=0;for(let m=1;m<=12;m++){const mo=S.months[mk(y,m)];const row=mo&&mo.cells[e.id];if(row)Object.values(row).forEach(c=>{if(c.c==="ZU")n++;});}return n;}
+function ratio(e){const sd=sollD(e);if(sd!==null)return sd?istD(e)/sd:9;const s=sollH(e);return s?istH(e)/s:9;}
+function runLen(id,d,dir,pred){let n=0,k=d+dir;while(n<40&&pred(code(id,k))){n++;k+=dir;}return n;}
+
+function canAssign(e,d,c){
+  if(code(e.id,d))return false;
+  if(e.onlyFd&&c!=="Fd")return false;
+  if(e.fixFd){const w=wday(Y,M,d);if(w===0||w===6)return false;}
+  if(c==="Nc"&&!e.nights)return false;
+  if(!restOK(code(e.id,d-1),c)||!restOK(c,code(e.id,d+1)))return false;
+  const st=S.settings;
+  if(runLen(e.id,d,-1,isWork)+1+runLen(e.id,d,1,isWork)>st.maxConsec)return false;
+  if(c!=="Nc"){for(let k=1;k<=st.freeAfterNight;k++)if(code(e.id,d-k)==="Nc")return false;}
+  else{
+    if(runLen(e.id,d,-1,x=>x==="Nc")>=st.nightBlockMax)return false;
+    if(code(e.id,d+1)!=="Nc"){for(let k=1;k<=st.freeAfterNight;k++)if(isWork(code(e.id,d+k)))return false;}
+  }
+  return true;
+}
+function count(d,c){return active().filter(e=>code(e.id,d)===c).length;}
+function men(d,codes){return S.emps.filter(e=>e.male&&codes.includes(code(e.id,d))).length;}
+function score(e,d,c){
+  let s=ratio(e);
+  if(code(e.id,d-1)===c)s-=.06;
+  const w=wday(Y,M,d);
+  if(w===0&&code(e.id,d-1)===c)s-=.12;
+  if(c==="Nc"&&code(e.id,d-1)==="Nc")s-=1;
+  return s;
+}
+function pick(d,c,needMan){
+  let cands=active().filter(e=>canAssign(e,d,c));
+  if(needMan){const m=cands.filter(e=>e.male);if(m.length)cands=m;}
+  cands.sort((a,b)=>score(a,d,c)-score(b,d,c));
+  return cands[0]||null;
+}
+function clearAuto(){const mo=mon(Y,M);Object.values(mo.cells).forEach(row=>{Object.keys(row).forEach(d=>{if(row[d].src==="auto")delete row[d];});});}
+function autoNights(){
+  const mo=mon(Y,M),N=dim(Y,M);
+  Object.values(mo.cells).forEach(row=>{Object.keys(row).forEach(d=>{if(row[d].src==="auto"&&row[d].c==="Nc")delete row[d];});});
+  let miss=0;for(let d=1;d<=N;d++){const need=+mo.nights[d]||0;while(count(d,"Nc")<need){const e=pick(d,"Nc",false);if(!e){miss++;break;}setCell(e.id,d,{c:"Nc",src:"auto"});}}
+  save();render();toast(miss?`Nächte verteilt, an ${miss} Tag(en) fehlt jemand`:"Nächte verteilt. Prüfen, ändern, dann Schritt 2");
+}
+function autoRest(){
+  const mo=mon(Y,M);Object.values(mo.cells).forEach(row=>{Object.values(row).forEach(c=>{if(c.src==="auto"&&c.c==="Nc")c.src="fix";});});
+  autoPlan();
+}
+function autoPlan(){
+  clearAuto();const N=dim(Y,M),st=S.settings,mo=mon(Y,M);
+  const put=(e,d,c)=>setCell(e.id,d,{c,src:"auto"});
+  active().filter(e=>e.fixFd).forEach(e=>{for(let d=1;d<=N;d++){if(isWorkday(d)&&!code(e.id,d))put(e,d,"Fd");}});
+  for(let d=1;d<=N;d++){const need=+mo.nights[d]||0;while(count(d,"Nc")<need){const e=pick(d,"Nc",false);if(!e)break;put(e,d,"Nc");}}
+  for(let d=1;d<=N;d++){
+    const late=()=>count(d,"Se")+count(d,"Sb");
+    while(count(d,"Se")<st.se){const e=pick(d,"Se",st.manLate&&men(d,["Se"])===0);if(!e)break;put(e,d,"Se");}
+    while(count(d,"Sb")<st.sb){const e=pick(d,"Sb",false);if(!e)break;put(e,d,"Sb");}
+    while(count(d,"Fd")<st.minFd){const e=pick(d,"Fd",st.manFd&&men(d,["Fd"])===0);if(!e)break;put(e,d,"Fd");}
+    if(st.manFd&&men(d,["Fd"])===0){const e=pick(d,"Fd",true);if(e&&e.male)put(e,d,"Fd");}
+  }
+  // Auffüllen bis Soll mit Frühdiensten
+  let moved=true,guard=0;
+  while(moved&&guard++<400){moved=false;
+    const under=active().filter(e=>{const sd=sollD(e);return sd!==null?istD(e)<sd:sollH(e)-istH(e)>=S.shifts.Fd.h-0.01;}).sort((a,b)=>ratio(a)-ratio(b));
+    for(const e of under){
+      let best=null,bs=1e9;
+      for(let d=1;d<=N;d++){if(!canAssign(e,d,"Fd"))continue;const s=count(d,"Fd")+(isWorkday(d)?0:.5)-(code(e.id,d-1)==="Fd"||code(e.id,d+1)==="Fd"?.3:0);if(s<bs){bs=s;best=d;}}
+      if(best){put(e,best,"Fd");moved=true;}
+    }
+  }
+  save();render();
+  const r=check();toast(r.err?`Vorschlag erstellt, ${r.err} Fehler offen`:"Vorschlag erstellt, keine Fehler");
+}
+
+// Prüfung
+let BAD=new Set(),DAYBAD={};
+function check(){
+  BAD=new Set();DAYBAD={};const out=[],N=dim(Y,M),st=S.settings,mo=mon(Y,M);
+  const add=(lvl,where,txt,cells)=>{out.push({lvl,where,txt});(cells||[]).forEach(k=>BAD.add(k));};
+  for(let d=1;d<=N;d++){
+    const tag=`${WD[wday(Y,M,d)]} ${d}.`;const fd=count(d,"Fd"),se=count(d,"Se"),sb=count(d,"Sb"),nc=count(d,"Nc"),need=+mo.nights[d]||0;
+    DAYBAD[d]={Fd:fd<st.minFd,Se:se!==st.se,Sb:sb!==st.sb,Nc:nc!==need};
+    if(fd<st.minFd)add("err",tag,`nur ${fd} Frühdienst${fd===1?"":"e"}, mindestens ${st.minFd}`);
+    if(se!==st.se)add(se<st.se?"err":"warn",tag,`${se} Se statt ${st.se}`);
+    if(sb!==st.sb)add(sb<st.sb?"err":"warn",tag,`${sb} Sb statt ${st.sb}`);
+    if(nc!==need)add(nc<need?"err":"warn",tag,`${nc} Nachtdienst${nc===1?"":"e"} statt ${need}`);
+    if(st.manFd&&fd>0&&men(d,["Fd"])===0)add("err",tag,"kein Mann im Frühdienst");
+    if(st.manLate&&se>0&&men(d,["Se"])===0)add("err",tag,"kein Mann im Spätdienst (Se)");
+  }
+  S.emps.forEach(e=>{
+    const n=e.name||"?";let wishes=0;
+    for(let d=1;d<=N;d++){
+      const cell=cellAt(e.id,Y,M,d),c=cell&&cell.c,tag=`${n}, ${d}.`;
+      if(cell&&cell.src==="wish")wishes++;
+      if(!isWork(c))continue;
+      if(!plannable(e))add("warn",tag,`ist als „nicht verplanen“ markiert, hat aber ${c}`,[e.id+"|"+d]);
+      if(e.onlyFd&&c!=="Fd")add("err",tag,`macht nur Frühdienst, eingetragen ist ${c}`,[e.id+"|"+d]);
+      const p=code(e.id,d-1);
+      if(!restOK(p,c)){const r=24+span(c)[0]-span(p)[1];add("err",tag,`${p} → ${c}: nur ${Math.max(0,Math.round(r*10)/10)} h Ruhezeit (mind. ${st.minRest} h)`,[e.id+"|"+d,e.id+"|"+(d-1)]);}
+      if(c!=="Nc"){for(let k=1;k<=st.freeAfterNight;k++){if(code(e.id,d-k)==="Nc"&&k>1){add("warn",tag,`${c} nur ${k-1} Tag${k-1===1?"":"e"} nach Nachtdienst frei`,[e.id+"|"+d]);break;}}}
+      if(!isWork(code(e.id,d+1))){const run=runLen(e.id,d+1,-1,isWork);if(run>st.maxConsec)add("warn",tag,`${run} Tage am Stück (max. ${st.maxConsec})`,[e.id+"|"+d]);}
+    }
+    if(wishes>st.maxWishes)add("warn",n,`${wishes} Wünsche eingetragen, erlaubt sind ${st.maxWishes}`);
+    if(plannable(e)){const sd=sollD(e);
+      if(sd!==null){const i=istD(e);if(i!==sd)add("warn",n,`${i} Dienste, Soll ${sd}`);}
+      else{const diff=Math.round((istH(e)-sollH(e))*10)/10;if(Math.abs(diff)>=8)add("warn",n,`${diff>0?"+":""}${String(diff).replace(".",",")} h gegenüber Soll`);}}
+  });
+  const err=out.filter(o=>o.lvl==="err").length,warn=out.length-err;
+  return{list:out,err,warn};
+}
+
+// Darstellung
+let sel=null,wishMode=false,view="plan";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(x)=>String(Math.round(x*10)/10).replace(".",",");
+function render(){
+  HOL=holidays(Y);
+  $("mTitle").textContent=MON[M-1]+" "+Y;
+  const r=check();
+  $("status").innerHTML=(r.err?`<span class="pill err">${r.err} Fehler</span>`:`<span class="pill ok">Besetzung ok</span>`)+(r.warn?`<span class="pill warn">${r.warn} Hinweise</span>`:"");
+  $("sampleNote").hidden=!S.sample;
+  renderGrid();renderIssues(r);renderPalette();renderNightInfo();
+  if(view==="team")renderTeam();if(view==="month")renderMonth();if(view==="rules")renderRules();
+}
+function renderGrid(){
+  const N=dim(Y,M);let h='<table class="plan"><thead><tr><th class="name">'+esc(MON[M-1].slice(0,3))+'</th>';
+  const cls=(d)=>{const w=wday(Y,M,d);return holName(d)?"hol":(w===0||w===6?"we":"");};
+  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}" title="${esc(holName(d)||"")}">${d}<span class="wd">${WD[wday(Y,M,d)]}</span></th>`;
+  h+='<th class="sum">Ist / Soll</th></tr></thead><tbody>';
+  S.emps.forEach(e=>{
+    const off=!plannable(e);
+    h+=`<tr class="${off?"off":""}"><th class="name ${off?"off":""}">${esc(e.name||"?")}<small>${e.weekly} h${e.male?" · m":""}${e.fixFd?" · Mo–Fr Fd":e.onlyFd?" · nur Fd":""}${off?" · nicht verplanen":""}</small></th>`;
+    for(let d=1;d<=N;d++){const cell=cellAt(e.id,Y,M,d);let c="",k=cls(d);
+      if(cell){c=cell.c;k+=" "+(c==="/"?"frei":c)+(cell.src==="auto"?" auto":"")+(cell.src==="wish"?" wish":"");}
+      if(BAD.has(e.id+"|"+d))k+=" bad";
+      h+=`<td class="c ${k}" data-e="${e.id}" data-d="${d}">${esc(c)}</td>`;}
+    const sd=sollD(e);let txt,st="";
+    if(sd!==null){const i=istD(e);txt=`${i} / ${sd} D`;st=i<sd?"under":i>sd?"over":"";}
+    else{const i=istH(e),s=sollH(e);txt=`${fmt(i)} / ${fmt(s)}`;st=i-s<=-8?"under":i-s>=8?"over":"";}
+    h+=`<td class="hrs ${off?"":st}">${off?"–":txt}</td></tr>`;
+  });
+  h+='</tbody><tfoot>';
+  [["Fd","Früh"],["Se","Spät"],["Sb","Spät B"],["Nc","Nacht"]].forEach(([c,l])=>{
+    h+=`<tr><th class="name">${l}</th>`;for(let d=1;d<=N;d++){const n=count(d,c);const bad=DAYBAD[d]&&DAYBAD[d][c];const need=+mon(Y,M).nights[d]||0;h+=`<td class="${bad?"bad":"good"}">${c==="Nc"&&(need||n)?n+"/"+need:n}</td>`;}h+='<td></td></tr>';});
+  h+=`<tr><th class="name">Mann F/S</th>`;for(let d=1;d<=N;d++){const a=men(d,["Fd"]),b=men(d,["Se"]);const bad=(S.settings.manFd&&a===0)||(S.settings.manLate&&b===0);h+=`<td class="${bad?"bad":"good"}">${a}/${b}</td>`;}h+='<td></td></tr>';
+  h+='</tfoot></table>';
+  const box=$("gridbox"),sl=box.scrollLeft,stp=box.scrollTop;box.innerHTML=h;box.scrollLeft=sl;box.scrollTop=stp;
+}
+function renderNightInfo(){
+  const mo=mon(Y,M),N=dim(Y,M);let days=0,tot=0,have=0;for(let d=1;d<=N;d++){const n=+mo.nights[d]||0;if(n){days++;tot+=n;have+=Math.min(n,count(d,"Nc"));}}
+  $("nightInfo").innerHTML=days?`<b>Nächte für B1:</b> ${days} Tage, ${tot} Nachtdienste, davon ${have} besetzt.`:`<b>Noch keine Nächte für B1 eingetragen.</b> Erst die Tage von B2 unter „Nächte eintragen“ erfassen, dann Schritt 1 und 2.`;
+}
+function renderIssues(r){
+  if(!r.list.length){$("issues").innerHTML='<h2>Prüfung</h2><p class="note">Keine Fehler und keine Hinweise.</p>';return;}
+  const sorted=r.list.slice().sort((a,b)=>(a.lvl===b.lvl?0:a.lvl==="err"?-1:1));
+  $("issues").innerHTML='<h2>Prüfung</h2>'+sorted.slice(0,120).map(o=>`<div class="issue ${o.lvl}"><b>${esc(o.where)}</b><span>${esc(o.txt)}</span></div>`).join("")+(sorted.length>120?`<p class="note">… und ${sorted.length-120} weitere</p>`:"");
+}
+function renderPalette(){
+  const show=view==="plan";$("palette").hidden=!show;if(!show)return;
+  const items=[["","Leeren",""],["Fd","Fd","Fd"],["Se","Se","Se"],["Sb","Sb","Sb"],["Nc","Nc","Nc"],["/","/ frei","abs"],["Ug","Ug","abs"],["KM","KM","abs"],["WB","WB","abs"],["ZU","ZU","abs"]];
+  let h=`<label class="toggle"><input type="checkbox" id="wishT" ${wishMode?"checked":""}> Wunsch</label>`;
+  items.forEach(([c,l,k])=>{const dis=wishMode&&c&&!WISHABLE.includes(c);h+=`<button class="chip ${k}" data-c="${c}" aria-pressed="${sel===c}" ${dis?"disabled style='opacity:.35'":""}>${esc(l)}</button>`;});
+  $("palRow").innerHTML=h;
+  $("palHint").textContent=sel===null?"Kürzel wählen, dann Felder antippen. Nochmal tippen löscht.":wishMode?`Wunsch „${sel||"leeren"}“: Felder antippen. Wünsche plant die Automatik fest ein.`:`„${sel||"Leeren"}“ fest eintragen: Felder antippen.`;
+}
+function renderTeam(){
+  $("empList").innerHTML=S.emps.map((e,i)=>`<div class="emp" data-id="${e.id}">
+    <div class="r"><input type="text" value="${esc(e.name)}" data-f="name" aria-label="Kürzel" maxlength="12">
+      <select data-f="weekly" aria-label="Wochenstunden">${[38.5,35,30,25,20,40].map(v=>`<option ${+e.weekly===v?"selected":""} value="${v}">${String(v).replace(".",",")} h</option>`).join("")}</select>
+      <button class="btn small" data-a="up" ${i===0?"disabled":""} aria-label="nach oben">↑</button><button class="btn small" data-a="down" ${i===S.emps.length-1?"disabled":""} aria-label="nach unten">↓</button>
+      <button class="btn small danger" data-a="del">Entfernen</button></div>
+    <div class="r"><label class="inl">ZU-Tage/Jahr <input type="number" min="0" max="20" data-f="zu" value="${e.zu??0}"></label><span class="note">${Y}: ${zuCount(e,Y)} genommen oder geplant${(e.zu??0)?", "+Math.max(0,(e.zu??0)-zuCount(e,Y))+" offen":""}</span></div>
+    <div class="r"><label class="inl"><input type="checkbox" data-f="male" ${e.male?"checked":""}> Mann</label>
+      <label class="inl"><input type="checkbox" data-f="onlyFd" ${e.onlyFd?"checked":""}> nur Frühdienst</label>
+      <label class="inl"><input type="checkbox" data-f="fixFd" ${e.fixFd?"checked":""}> fest Mo–Fr Früh, kein Wochenende</label>
+      <label class="inl"><input type="checkbox" data-f="nights" ${e.nights?"checked":""}> macht Nachtdienst</label>
+      <label class="inl"><input type="checkbox" data-f="planNo" ${e.plan==="nein"?"checked":""}> nicht verplanen</label>
+      ${e.plan==="nein"?`<label class="inl">bis einschl. <input type="month" data-f="until" value="${esc(e.until||"")}"></label>`:""}</div>
+    ${delAsk===e.id?`<div class="confirm"><span>${esc(e.name)} mit allen Einträgen entfernen?</span><button class="btn small danger" data-a="delyes">Ja, entfernen</button><button class="btn small" data-a="delno">Abbrechen</button></div>`:""}
+  </div>`).join("")||'<p class="note">Noch niemand angelegt.</p>';
+}
+let delAsk=null,wipeAsk=false;
+function renderMonth(){
+  const N=dim(Y,M),mo=mon(Y,M);let h=["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div class="h">${x}</div>`).join("");
+  const first=(wday(Y,M,1)+6)%7;for(let i=0;i<first;i++)h+="<div></div>";
+  for(let d=1;d<=N;d++){const n=+mo.nights[d]||0;h+=`<button class="n${n}" data-d="${d}">${d}<small>${n?n+" Nc":"–"}</small></button>`;}
+  $("nightCal").innerHTML=h;
+  $("sollList").innerHTML=active().map(e=>{const o=mo.soll[e.id]||{};return`<div class="emp" data-id="${e.id}"><div class="r"><b style="min-width:6em">${esc(e.name)}</b>
+    <label class="inl">Stunden <input type="number" step="0.5" min="0" data-s="h" value="${o.h??""}" placeholder="${fmt(sollH(Object.assign({},e)))}"></label>
+    <label class="inl">Dienste <input type="number" step="1" min="0" data-s="d" value="${o.d??""}" placeholder="–"></label></div></div>`;}).join("");
+}
+function renderRules(){
+  const st=S.settings;
+  const num=(k,l,min,max,step)=>`<label>${l}<input type="number" data-r="${k}" value="${st[k]}" min="${min}" max="${max}" step="${step||1}"></label>`;
+  const chk=(k,l)=>`<label>${l}<input type="checkbox" data-r="${k}" ${st[k]?"checked":""} style="width:20px;height:20px;accent-color:var(--accent)"></label>`;
+  $("rulesForm").innerHTML=num("minFd","Frühdienst mindestens",1,15)+num("se","Spätdienst Se genau",0,6)+num("sb","Spätdienst Sb genau",0,6)+chk("manFd","Mann im Frühdienst")+chk("manLate","Mann im Spätdienst (Se)")+num("minRest","Ruhezeit mindestens (h)",8,14,.5)+num("maxConsec","Tage am Stück höchstens",3,12)+num("freeAfterNight","Freie Tage nach Nachtblock",1,4)+num("nightBlockMax","Nächte am Stück höchstens",1,7)+num("maxWishes","Wünsche pro Person",0,10)+
+    `<label>Bundesland (Feiertage)<select data-r="land">${Object.entries(LAENDER).map(([k,v])=>`<option value="${k}" ${st.land===k?"selected":""}>${v}</option>`).join("")}</select></label>`;
+  $("shiftForm").innerHTML=WORK.map(c=>{const s=S.shifts[c];return`<label><b style="font-family:var(--f-mono)">${c}</b><span style="display:flex;gap:4px;align-items:center"><input type="time" data-sh="${c}.s" value="${s.s}"> – <input type="time" data-sh="${c}.e" value="${s.e}"> <input type="number" data-sh="${c}.h" value="${s.h}" step="0.25" style="width:4.2em" aria-label="Stunden"> h</span></label>`;}).join("");
+  $("wipeConfirm").innerHTML=wipeAsk?`<div class="confirm"><span>Wirklich Team und alle Pläne auf diesem Gerät löschen?</span><button class="btn small danger" id="wipeYes">Ja, alles löschen</button><button class="btn small" id="wipeNo">Abbrechen</button></div>`:"";
+}
+let tt;function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tt);tt=setTimeout(()=>el.hidden=true,2600);}
+
+// Ereignisse
+$("prevM").onclick=()=>{M--;if(M<1){M=12;Y--;}render();};
+$("nextM").onclick=()=>{M++;if(M>12){M=1;Y++;}render();};
+$("autoBtn").onclick=autoRest;$("nightBtn").onclick=autoNights;$("goNights").onclick=()=>document.querySelector('nav.tabs button[data-v="month"]').click();
+$("clearAutoBtn").onclick=()=>{clearAuto();save();render();toast("Vorschlag gelöscht, deine Einträge bleiben");};
+document.querySelector("nav.tabs").onclick=(ev)=>{const b=ev.target.closest("button");if(!b)return;view=b.dataset.v;
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.toggleAttribute("aria-current",x===b));document.querySelectorAll("nav.tabs button[aria-current]").forEach(x=>x.setAttribute("aria-current","page"));
+  ["plan","team","month","rules"].forEach(v=>$("v-"+v).hidden=v!==view);render();window.scrollTo(0,0);};
+$("palRow").addEventListener("click",(ev)=>{const b=ev.target.closest("button.chip");if(!b||b.disabled)return;sel=sel===b.dataset.c?null:b.dataset.c;renderPalette();});
+$("palRow").addEventListener("change",(ev)=>{if(ev.target.id==="wishT"){wishMode=ev.target.checked;if(wishMode&&sel&&!WISHABLE.includes(sel))sel=null;renderPalette();}});
+$("gridbox").addEventListener("click",(ev)=>{const td=ev.target.closest("td.c");if(!td)return;
+  if(sel===null){toast("Erst unten ein Kürzel wählen");return;}
+  const id=td.dataset.e,d=+td.dataset.d,cur=cellAt(id,Y,M,d),src=wishMode?"wish":"fix";
+  if(sel===""||(cur&&cur.c===sel&&cur.src===src))setCell(id,d,null);else setCell(id,d,{c:sel,src});
+  save();render();});
+$("addEmp").onclick=()=>{S.emps.push({id:uid(),name:"MA "+String(S.emps.length+1).padStart(2,"0"),weekly:38.5,zu:9,male:false,onlyFd:false,nights:true,plan:"ja"});save();render();};
+$("empList").addEventListener("change",(ev)=>{const row=ev.target.closest(".emp");if(!row)return;const e=S.emps.find(x=>x.id===row.dataset.id),f=ev.target.dataset.f;if(!e||!f)return;
+  if(f==="name")e.name=ev.target.value.trim();else if(f==="weekly")e.weekly=+ev.target.value;else if(f==="zu")e.zu=+ev.target.value;else if(f==="planNo"){e.plan=ev.target.checked?"nein":"ja";}else if(f==="until")e.until=ev.target.value;else e[f]=ev.target.checked;save();render();});
+$("empList").addEventListener("click",(ev)=>{const b=ev.target.closest("button[data-a]");if(!b)return;const row=b.closest(".emp"),i=S.emps.findIndex(x=>x.id===row.dataset.id),a=b.dataset.a;
+  if(a==="up"&&i>0)[S.emps[i-1],S.emps[i]]=[S.emps[i],S.emps[i-1]];
+  if(a==="down"&&i<S.emps.length-1)[S.emps[i+1],S.emps[i]]=[S.emps[i],S.emps[i+1]];
+  if(a==="del")delAsk=S.emps[i].id;if(a==="delno")delAsk=null;
+  if(a==="delyes"){const id=S.emps[i].id;S.emps.splice(i,1);Object.values(S.months).forEach(m=>{delete m.cells[id];delete m.soll[id];});delAsk=null;}
+  save();render();});
+$("nightCal").addEventListener("click",(ev)=>{const b=ev.target.closest("button[data-d]");if(!b)return;const mo=mon(Y,M),d=b.dataset.d;mo.nights[d]=((+mo.nights[d]||0)+1)%3;if(!mo.nights[d])delete mo.nights[d];save();render();});
+$("sollList").addEventListener("change",(ev)=>{const row=ev.target.closest(".emp"),k=ev.target.dataset.s;if(!row||!k)return;const mo=mon(Y,M);const o=mo.soll[row.dataset.id]||(mo.soll[row.dataset.id]={});if(ev.target.value==="")delete o[k];else o[k]=+ev.target.value;save();render();});
+$("rulesForm").addEventListener("change",(ev)=>{const k=ev.target.dataset.r;if(!k)return;S.settings[k]=ev.target.type==="checkbox"?ev.target.checked:ev.target.type==="number"?+ev.target.value:ev.target.value;save();render();});
+$("shiftForm").addEventListener("change",(ev)=>{const k=ev.target.dataset.sh;if(!k)return;const[c,f]=k.split(".");S.shifts[c][f]=f==="h"?+ev.target.value:ev.target.value;save();render();});
+$("exportBtn").onclick=()=>{const t=JSON.stringify(S);$("io").value=t;const done=()=>toast("Sicherung kopiert");if(navigator.clipboard)navigator.clipboard.writeText(t).then(done,()=>{$("io").select();toast("Text markiert, bitte selbst kopieren");});else{$("io").select();}};
+$("importBtn").onclick=()=>{try{const d=JSON.parse($("io").value);if(!d||!Array.isArray(d.emps))throw 0;S=Object.assign(defaults(),d);save();render();toast("Sicherung geladen");}catch(e){toast("Der Text ist keine gültige Sicherung");}};
+$("wipeBtn").onclick=()=>{wipeAsk=true;renderRules();};
+$("wipeConfirm").addEventListener("click",(ev)=>{if(ev.target.id==="wipeYes"){S=defaults();wipeAsk=false;save();render();toast("Alles gelöscht");}if(ev.target.id==="wipeNo"){wipeAsk=false;renderRules();}});
+window._x=()=>{S=team();save();render();toast("Stationsteam geladen, alle Einträge leer");};
+$("demoBtn").onclick=()=>{S=demo();save();render();toast("Beispieldaten geladen");};
+
+
+const MEN=[];
+const TEAM=[];
+function team(){const s=defaults();s.emps=TEAM.map(([n,w,o])=>Object.assign({id:uid(),name:n,weekly:w,zu:w===38.5?9:0,male:MEN.includes(n),onlyFd:false,nights:true,plan:"ja"},o||{}));s.menSet=true;s.fixSet=true;return s;}
+
+// Beispieldaten (erfunden)
+function demo(){
+  const s=defaults();s.sample=true;s.teamOffered=true;
+  const spec=[["L-oben",40,1,1,0],["SL",40,1,0,1],["A.",40,0,0,1],["B.",30,1,0,1],["C.",40,0,0,1],["D.",40,1,0,1],["E.",40,0,0,1],["F.",30,0,0,1],["G.",40,1,0,1],["H.",40,0,0,1],["I.",40,1,0,1],["J.",30,0,0,1],["K.",40,0,0,1],["L.",40,1,0,1],["M.",40,0,0,1],["N.",30,1,0,1],["O.",40,0,0,1],["P.",40,1,0,1],["Q.",40,0,0,1],["R.",30,0,0,1]];
+  s.emps=spec.map(([n,w,m,f,nc])=>({id:uid(),name:n,weekly:w===40?38.5:w,zu:w===40?9:0,male:!!m,onlyFd:!!f,nights:!!nc,plan:"ja"}));
+  s.emps.push({id:uid(),name:"FWB",weekly:38.5,zu:9,male:true,onlyFd:false,nights:true,plan:"nein",until:"2027-04"});
+  s.emps.push({id:uid(),name:"Fremd",weekly:30,male:false,onlyFd:false,nights:true,plan:"nein",until:""});
+  const t=new Date();let y=t.getFullYear(),m=t.getMonth()+2;if(m>12){m=1;y++;}
+  const mo={cells:{},nights:{},soll:{}};s.months[mk(y,m)]=mo;
+  const set=(i,d,c,src)=>{const id=s.emps[i].id;(mo.cells[id]=mo.cells[id]||{})[d]={c,src:src||"fix"};};
+  [[3,5,6,7,8,9],[7,19,20,21,22,23],[12,26,27,28,29,30],[16,12,13,14,15,16]].forEach(([i,...ds])=>ds.forEach(d=>set(i,d,"Ug")));
+  [[5,1,2,3,4],[10,8,9]].forEach(([i,...ds])=>ds.forEach(d=>set(i,d,"WB")));
+  set(6,18,"ZU");set(11,30,"ZU");
+  [[2,24,"/"],[2,31,"/"],[4,6,"Fd"],[4,13,"/"],[9,24,"/"],[9,25,"/"],[13,10,"Se"],[13,11,"Se"],[18,1,"/"],[18,2,"/"]].forEach(([i,d,c])=>set(i,d,c,"wish"));
+  for(let d=1;d<=7;d++)mo.nights[d]=2;for(let d=15;d<=21;d++)mo.nights[d]=2;
+  return s;
+}
+
+$("fileExp").onclick=async()=>{const t=JSON.stringify(S),name="dienstplan-"+mk(Y,M)+"-"+new Date().toISOString().slice(0,10)+".json";
+  try{const f=new File([t],name,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return;}}catch(e){if(e&&e.name==="AbortError")return;}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);};
+$("fileImp").onchange=(ev)=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.emps))throw 0;S=Object.assign(defaults(),d);S.sample=false;S.teamOffered=true;S.menSet=true;S.fixSet=true;save();render();toast("Datei geladen");}catch(e){toast("Die Datei ist keine gültige Sicherung");}ev.target.value="";};r.readAsText(f);};
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+load();render();
+})();
+</script>
+
+</body>
+</html>
