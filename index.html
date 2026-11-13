@@ -89,6 +89,8 @@ table.plan{border-collapse:separate;border-spacing:0;font-variant-numeric:tabula
 .plan td.c.auto{font-weight:400}
 .plan td.c.wish::after{content:"W";position:absolute;right:2px;top:1px;font-size:.55rem;color:var(--accent);font-weight:700}
 .plan td.c.wish{box-shadow:inset 0 0 0 2px var(--accent)}
+.plan td.c.blk::before{content:attr(data-bl);position:absolute;left:2px;top:1px;font-size:.55rem;color:var(--accent);font-weight:700}
+.chip.blkc{border-style:dashed;font-family:var(--f-text);font-size:.8rem}
 .plan td.c.bad{box-shadow:inset 0 0 0 2px var(--err)}
 .plan td.c.bad.wish{box-shadow:inset 0 0 0 2px var(--err)}
 .plan tr.off td.c{background-image:repeating-linear-gradient(135deg,transparent 0 6px,var(--line) 6px 7px)}
@@ -232,7 +234,7 @@ body.paper .plan thead th{min-width:30px}
     </div>
     <div class="card">
       <h2>Soll für diesen Monat</h2>
-      <p class="note">Leer lassen, dann rechnet die App selbst nach TVöD-K: Montag bis Freitag × Wochenstunden ÷ 5, minus ein Fünftel für jeden Feiertag sowie 24. und 31.12., die auf Montag bis Samstag fallen. Urlaub, WB und Krank zählen an Werktagen als Stunden. Wenn du Soll-Dienste einträgst, plant die Automatik nach Dienstanzahl.</p>
+      <p class="note">Leer lassen, dann rechnet die App selbst nach TVöD-K: Montag bis Freitag × Wochenstunden ÷ 5, minus ein Fünftel für jeden Feiertag sowie 24. und 31.12., die auf Montag bis Samstag fallen. Urlaub, WB und Krank zählen an Werktagen als Stunden. Wenn du Soll-Dienste einträgst, plant die Automatik nach Dienstanzahl. „Vortrag“ sind die Stunden aus dem Vormonat (Spalte Vortrag im alten Programm); die Automatik gleicht sie mit aus.</p>
       <div id="sollList" style="margin-top:8px"></div>
     </div>
   </section>
@@ -304,7 +306,7 @@ function defaults(){return{
   emps:[],months:{},sample:false};}
 
 let S;
-function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(defaults(),JSON.parse(raw));S.settings=Object.assign(defaults().settings,S.settings);if(!S.sample&&!S.menSet){S.emps.forEach(e=>{if(MEN.includes(e.name))e.male=true;});S.menSet=true;}const n=S.shifts.Nc;if(n&&n.s==="21:30"&&n.e==="06:30"){S.shifts.Nc={s:"22:30",e:"07:00",h:8};}if(!S.settings.land)S.settings.land="SN";if(S.shifts.Se&&S.shifts.Se.s==="15:00")S.shifts.Se.s="14:30";if(S.shifts.Nc&&S.shifts.Nc.h===8.5)S.shifts.Nc.h=8;const f=S.shifts.Fd;if(f&&f.s==="06:00"&&f.e==="14:00"){f.s="06:30";f.e="15:00";}return;}}catch(e){}S=defaults();S.teamOffered=true;S.menSet=true;S.fixSet=true;}
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(defaults(),JSON.parse(raw));S.settings=Object.assign(defaults().settings,S.settings);if(!S.sample&&!S.hoursSet){const H={"Ines F.":32,"Cornelia G.":32,"Liane G.":36,"Tobias B.":36};S.emps.forEach(e=>{if(e.weekly===30||H[e.name]){e.weekly=H[e.name]||38.5;if(e.weekly===38.5&&!e.zu)e.zu=9;}});S.hoursSet=true;}if(!S.sample&&!S.menSet){S.emps.forEach(e=>{if(MEN.includes(e.name))e.male=true;});S.menSet=true;}const n=S.shifts.Nc;if(n&&n.s==="21:30"&&n.e==="06:30"){S.shifts.Nc={s:"22:30",e:"07:00",h:8};}if(!S.settings.land)S.settings.land="SN";if(S.shifts.Se&&S.shifts.Se.s==="15:00")S.shifts.Se.s="14:30";if(S.shifts.Nc&&S.shifts.Nc.h===8.5)S.shifts.Nc.h=8;const f=S.shifts.Fd;if(f&&f.s==="06:00"&&f.e==="14:00"){f.s="06:30";f.e="15:00";}return;}}catch(e){}S=defaults();S.teamOffered=true;S.menSet=true;S.fixSet=true;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 const now=new Date();let Y=now.getFullYear(),M=now.getMonth()+2;if(M>12){M=1;Y++;}
 const mk=(y,m)=>y+"-"+String(m).padStart(2,"0");
@@ -348,11 +350,16 @@ function sollD(e){const o=mon(Y,M).soll[e.id]||{};return(o.d!==undefined&&o.d!==
 function istH(e){let h=0;for(let d=1;d<=dim(Y,M);d++){const c=code(e.id,d);if(c)h+=credit(e,d,c);}return Math.round(h*10)/10;}
 function istD(e){let n=0;for(let d=1;d<=dim(Y,M);d++)if(isWork(code(e.id,d)))n++;return n;}
 function zuCount(e,y){let n=0;for(let m=1;m<=12;m++){const mo=S.months[mk(y,m)];const row=mo&&mo.cells[e.id];if(row)Object.values(row).forEach(c=>{if(c.c==="ZU")n++;});}return n;}
-function ratio(e){const sd=sollD(e);if(sd!==null)return sd?istD(e)/sd:9;const s=sollH(e);return s?istH(e)/s:9;}
+const BLOCKS={"kF":["Fd","Sb"],"kS":["Se","Sb","Nc"],"kN":["Nc"]};const BLTXT={"kF":"kein Früh","kS":"kein Spät/Nacht","kN":"keine Nacht"};
+function blk(id,d){const mo=S.months[mk(Y,M)];return mo&&mo.block&&mo.block[id]?mo.block[id][d]||null:null;}
+function vortrag(e){const o=mon(Y,M).soll[e.id]||{};return +o.v||0;}
+function ratio(e){const sd=sollD(e);if(sd!==null)return sd?istD(e)/sd:9;const s=sollH(e);return s?(istH(e)+vortrag(e))/s:9;}
 function runLen(id,d,dir,pred){let n=0,k=d+dir;while(n<40&&pred(code(id,k))){n++;k+=dir;}return n;}
 
 function canAssign(e,d,c){
   if(code(e.id,d))return false;
+  const b=blk(e.id,d);if(b&&BLOCKS[b].includes(c))return false;
+  if(c==="Nc"&&code(e.id,d+1)==="/")return false;
   if(e.onlyFd&&c!=="Fd")return false;
   if(e.fixFd){const w=wday(Y,M,d);if(w===0||w===6)return false;}
   if(c==="Nc"&&!e.nights)return false;
@@ -408,7 +415,7 @@ function autoPlan(){
   // Auffüllen bis Soll mit Frühdiensten
   let moved=true,guard=0;
   while(moved&&guard++<400){moved=false;
-    const under=active().filter(e=>{const sd=sollD(e);return sd!==null?istD(e)<sd:sollH(e)-istH(e)>=S.shifts.Fd.h-0.01;}).sort((a,b)=>ratio(a)-ratio(b));
+    const under=active().filter(e=>{const sd=sollD(e);return sd!==null?istD(e)<sd:sollH(e)-istH(e)-vortrag(e)>=S.shifts.Fd.h-0.01;}).sort((a,b)=>ratio(a)-ratio(b));
     for(const e of under){
       let best=null,bs=1e9;
       for(let d=1;d<=N;d++){if(!canAssign(e,d,"Fd"))continue;const s=count(d,"Fd")+(isWorkday(d)?0:.5)-(code(e.id,d-1)==="Fd"||code(e.id,d+1)==="Fd"?.3:0);if(s<bs){bs=s;best=d;}}
@@ -438,7 +445,8 @@ function check(){
     const n=e.name||"?";let wishes=0;
     for(let d=1;d<=N;d++){
       const cell=cellAt(e.id,Y,M,d),c=cell&&cell.c,tag=`${n}, ${d}.`;
-      if(cell&&cell.src==="wish")wishes++;
+      const isW=(dd)=>{const cc=cellAt(e.id,Y,M,dd);return (cc&&cc.src==="wish")||!!blk(e.id,dd);};if(isW(d)&&!(d>1&&isW(d-1)))wishes++;
+      const bb=blk(e.id,d);if(bb&&c&&BLOCKS[bb].includes(c))add("warn",tag,`Wunsch „${BLTXT[bb]}“, eingetragen ist ${c}`,[e.id+"|"+d]);
       if(!isWork(c))continue;
       if(!plannable(e))add("warn",tag,`ist als „nicht verplanen“ markiert, hat aber ${c}`,[e.id+"|"+d]);
       if(e.onlyFd&&c!=="Fd")add("err",tag,`macht nur Frühdienst, eingetragen ist ${c}`,[e.id+"|"+d]);
@@ -447,10 +455,10 @@ function check(){
       if(c!=="Nc"){for(let k=1;k<=st.freeAfterNight;k++){if(code(e.id,d-k)==="Nc"&&k>1){add("warn",tag,`${c} nur ${k-1} Tag${k-1===1?"":"e"} nach Nachtdienst frei`,[e.id+"|"+d]);break;}}}
       if(!isWork(code(e.id,d+1))){const run=runLen(e.id,d+1,-1,isWork);if(run>st.maxConsec)add("warn",tag,`${run} Tage am Stück (max. ${st.maxConsec})`,[e.id+"|"+d]);}
     }
-    if(wishes>st.maxWishes)add("warn",n,`${wishes} Wünsche eingetragen, erlaubt sind ${st.maxWishes}`);
+    if(wishes>st.maxWishes)add("warn",n,`${wishes} Wünsche eingetragen (zusammenhängende Tage zählen als einer), erlaubt sind ${st.maxWishes}`);
     if(plannable(e)){const sd=sollD(e);
       if(sd!==null){const i=istD(e);if(i!==sd)add("warn",n,`${i} Dienste, Soll ${sd}`);}
-      else{const diff=Math.round((istH(e)-sollH(e))*10)/10;if(Math.abs(diff)>=8)add("warn",n,`${diff>0?"+":""}${String(diff).replace(".",",")} h gegenüber Soll`);}}
+      else{const diff=Math.round((istH(e)+vortrag(e)-sollH(e))*10)/10;if(Math.abs(diff)>=8)add("warn",n,`Übertrag ${diff>0?"+":""}${String(diff).replace(".",",")} h (mit Vortrag)`);}}
   });
   const err=out.filter(o=>o.lvl==="err").length,warn=out.length-err;
   return{list:out,err,warn};
@@ -481,10 +489,11 @@ function renderGrid(){
     for(let d=1;d<=N;d++){const cell=cellAt(e.id,Y,M,d);let c="",k=cls(d);
       if(cell){c=cell.c;k+=" "+(c==="/"?"frei":c)+(cell.src==="auto"?" auto":"")+(cell.src==="wish"?" wish":"");}
       if(BAD.has(e.id+"|"+d))k+=" bad";
-      h+=`<td class="c ${k}" data-e="${e.id}" data-d="${d}">${esc(c)}</td>`;}
+      const bl=blk(e.id,d);if(bl)k+=" blk";
+      h+=`<td class="c ${k}" data-e="${e.id}" data-d="${d}"${bl?` data-bl="${bl}" title="${BLTXT[bl]}"`:""}>${esc(c)}</td>`;}
     const sd=sollD(e);let txt,st="";
     if(sd!==null){const i=istD(e);txt=`${i} / ${sd} D`;st=i<sd?"under":i>sd?"over":"";}
-    else{const i=istH(e),s=sollH(e);txt=`${fmt(i)} / ${fmt(s)}`;st=i-s<=-8?"under":i-s>=8?"over":"";}
+    else{const i=istH(e),s=sollH(e),v=vortrag(e),u=i+v-s;txt=`${fmt(i)} / ${fmt(s)}<br><small>Ü ${u>0?"+":""}${fmt(u)}</small>`;st=u<=-8?"under":u>=8?"over":"";}
     h+=`<td class="hrs ${off?"":st}">${off?"–":txt}</td></tr>`;
   });
   h+='</tbody><tfoot>';
@@ -499,13 +508,13 @@ function renderPrint(){
   const cls=(d)=>{const w=wday(Y,M,d);return (holName(d)?"hol":(w===0||w===6?"we":""))+(w===1?" mon":"");};
   const t=new Date(),today=`${pad(t.getDate())}.${pad(t.getMonth()+1)}.${t.getFullYear()}`;
   let h=`<div class="ps-head"><b>Dienstplan</b><b>${esc(st.station||"")} 01.${pad(M)}.${Y}-${N}.${pad(M)}.${Y}</b><b>Datum:${today}</b></div><table class="ps"><thead><tr><th class="n">${MON[M-1]} ${Y}</th>`;
-  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${d}</th>`;h+='<th class="h">Std.</th></tr><tr><th class="n"></th>';
-  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${W3[wday(Y,M,d)]}</th>`;h+='<th class="h">Soll</th></tr></thead><tbody>';
+  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${d}</th>`;h+='<th class="h">Vortr.</th><th class="h">+/-Plan</th><th class="h">Übertr.</th></tr><tr><th class="n"></th>';
+  for(let d=1;d<=N;d++)h+=`<th class="${cls(d)}">${W3[wday(Y,M,d)]}</th>`;h+='<th class="h"></th><th class="h"></th><th class="h"></th></tr></thead><tbody>';
   S.emps.forEach(e=>{const off=!plannable(e);h+=`<tr class="${off?"off":""}"><td class="n">${esc(e.name)}</td>`;
     for(let d=1;d<=N;d++){const c=code(e.id,d)||"";const g=ABS.includes(c)||c==="/";h+=`<td class="${cls(d)}${g?" grey":""}">${esc(c)}</td>`;}
-    h+=`<td class="h">${off?"":fmt(istH(e))+"/"+fmt(sollH(e))}</td></tr>`;});
+    const v=vortrag(e),pl=istH(e)-sollH(e),f2=(x)=>x.toFixed(2).replace(".",",");h+=`<td class="h">${f2(v)}</td><td class="h">${f2(pl)}</td><td class="h">${f2(v+pl)}</td></tr>`;});
   h+='</tbody><tfoot>';
-  [["Fd","Früh"],["Se","Spät"],["Sb","Spät B"],["Nc","Nacht"]].forEach(([c,l])=>{h+=`<tr><td class="n">${l}</td>`;for(let d=1;d<=N;d++)h+=`<td class="${cls(d)}">${count(d,c)}</td>`;h+='<td></td></tr>';});
+  [["Fd","Früh"],["Se","Spät"],["Sb","Spät B"],["Nc","Nacht"]].forEach(([c,l])=>{h+=`<tr><td class="n">${l}</td>`;for(let d=1;d<=N;d++)h+=`<td class="${cls(d)}">${count(d,c)}</td>`;h+='<td></td><td></td><td></td></tr>';});
   h+=`</tfoot></table><div class="ps-foot"><span>Fd 6:30–15:00 · Se 14:30–23:00 · Sb 12:30–21:00 · Nc 22:30–7:00 · Ug Urlaub · KM krank · WB Weiterbildung · ZU Zusatztag · / frei</span><span>Seite 1</span></div>`;
   $("printSheet").innerHTML=h;
 }
@@ -520,16 +529,16 @@ function renderIssues(r){
 }
 function renderPalette(){
   const show=view==="plan";$("palette").hidden=!show;if(!show)return;
-  const items=[["","Leeren",""],["Fd","Fd","Fd"],["Se","Se","Se"],["Sb","Sb","Sb"],["Nc","Nc","Nc"],["/","/ frei","abs"],["Ug","Ug","abs"],["KM","KM","abs"],["WB","WB","abs"],["ZU","ZU","abs"]];
+  const items=[["","Leeren",""],["Fd","Fd","Fd"],["Se","Se","Se"],["Sb","Sb","Sb"],["Nc","Nc","Nc"],["/","/ frei","abs"],["Ug","Ug","abs"],["KM","KM","abs"],["WB","WB","abs"],["ZU","ZU","abs"],["kF","kein Früh","blkc"],["kS","kein Spät/Nacht","blkc"],["kN","keine Nacht","blkc"]];
   let h=`<label class="toggle"><input type="checkbox" id="wishT" ${wishMode?"checked":""}> Wunsch</label>`;
-  items.forEach(([c,l,k])=>{const dis=wishMode&&c&&!WISHABLE.includes(c);h+=`<button class="chip ${k}" data-c="${c}" aria-pressed="${sel===c}" ${dis?"disabled style='opacity:.35'":""}>${esc(l)}</button>`;});
+  items.forEach(([c,l,k])=>{const dis=wishMode&&c&&!WISHABLE.includes(c)&&!BLOCKS[c];h+=`<button class="chip ${k}" data-c="${c}" aria-pressed="${sel===c}" ${dis?"disabled style='opacity:.35'":""}>${esc(l)}</button>`;});
   $("palRow").innerHTML=h;
   $("palHint").textContent=sel===null?"Kürzel wählen, dann Felder antippen. Nochmal tippen löscht.":wishMode?`Wunsch „${sel||"leeren"}“: Felder antippen. Wünsche plant die Automatik fest ein.`:`„${sel||"Leeren"}“ fest eintragen: Felder antippen.`;
 }
 function renderTeam(){
   $("empList").innerHTML=S.emps.map((e,i)=>`<div class="emp" data-id="${e.id}">
     <div class="r"><input type="text" value="${esc(e.name)}" data-f="name" aria-label="Kürzel" maxlength="12">
-      <select data-f="weekly" aria-label="Wochenstunden">${[38.5,35,30,25,20,40].map(v=>`<option ${+e.weekly===v?"selected":""} value="${v}">${String(v).replace(".",",")} h</option>`).join("")}</select>
+      <select data-f="weekly" aria-label="Wochenstunden">${[38.5,36,35,32,30,25,20,40].map(v=>`<option ${+e.weekly===v?"selected":""} value="${v}">${String(v).replace(".",",")} h</option>`).join("")}</select>
       <button class="btn small" data-a="up" ${i===0?"disabled":""} aria-label="nach oben">↑</button><button class="btn small" data-a="down" ${i===S.emps.length-1?"disabled":""} aria-label="nach unten">↓</button>
       <button class="btn small danger" data-a="del">Entfernen</button></div>
     <div class="r"><label class="inl">ZU-Tage/Jahr <input type="number" min="0" max="20" data-f="zu" value="${e.zu??0}"></label><span class="note">${Y}: ${zuCount(e,Y)} genommen oder geplant${(e.zu??0)?", "+Math.max(0,(e.zu??0)-zuCount(e,Y))+" offen":""}</span></div>
@@ -550,7 +559,8 @@ function renderMonth(){
   $("nightCal").innerHTML=h;
   $("sollList").innerHTML=active().map(e=>{const o=mo.soll[e.id]||{};return`<div class="emp" data-id="${e.id}"><div class="r"><b style="min-width:6em">${esc(e.name)}</b>
     <label class="inl">Stunden <input type="number" step="0.5" min="0" data-s="h" value="${o.h??""}" placeholder="${fmt(sollH(Object.assign({},e)))}"></label>
-    <label class="inl">Dienste <input type="number" step="1" min="0" data-s="d" value="${o.d??""}" placeholder="–"></label></div></div>`;}).join("");
+    <label class="inl">Dienste <input type="number" step="1" min="0" data-s="d" value="${o.d??""}" placeholder="–"></label>
+    <label class="inl">Vortrag h <input type="number" step="0.01" data-s="v" value="${o.v??""}" placeholder="0"></label></div></div>`;}).join("");
 }
 function renderRules(){
   const st=S.settings;
@@ -572,10 +582,12 @@ document.querySelector("nav.tabs").onclick=(ev)=>{const b=ev.target.closest("but
   document.querySelectorAll("nav.tabs button").forEach(x=>x.toggleAttribute("aria-current",x===b));document.querySelectorAll("nav.tabs button[aria-current]").forEach(x=>x.setAttribute("aria-current","page"));
   ["plan","team","month","rules"].forEach(v=>$("v-"+v).hidden=v!==view);render();window.scrollTo(0,0);};
 $("palRow").addEventListener("click",(ev)=>{const b=ev.target.closest("button.chip");if(!b||b.disabled)return;sel=sel===b.dataset.c?null:b.dataset.c;renderPalette();});
-$("palRow").addEventListener("change",(ev)=>{if(ev.target.id==="wishT"){wishMode=ev.target.checked;if(wishMode&&sel&&!WISHABLE.includes(sel))sel=null;renderPalette();}});
+$("palRow").addEventListener("change",(ev)=>{if(ev.target.id==="wishT"){wishMode=ev.target.checked;if(wishMode&&sel&&!WISHABLE.includes(sel)&&!BLOCKS[sel])sel=null;renderPalette();}});
 $("gridbox").addEventListener("click",(ev)=>{const td=ev.target.closest("td.c");if(!td)return;
   if(sel===null){toast("Erst unten ein Kürzel wählen");return;}
   const id=td.dataset.e,d=+td.dataset.d,cur=cellAt(id,Y,M,d),src=wishMode?"wish":"fix";
+  if(BLOCKS[sel]){const mo=mon(Y,M);mo.block=mo.block||{};const r=mo.block[id]=mo.block[id]||{};if(r[d]===sel)delete r[d];else r[d]=sel;save();render();return;}
+  if(sel===""){const mo=mon(Y,M);if(mo.block&&mo.block[id])delete mo.block[id][d];}
   if(sel===""||(cur&&cur.c===sel&&cur.src===src))setCell(id,d,null);else setCell(id,d,{c:sel,src});
   save();render();});
 $("addEmp").onclick=()=>{S.emps.push({id:uid(),name:"MA "+String(S.emps.length+1).padStart(2,"0"),weekly:38.5,zu:9,male:false,onlyFd:false,nights:true,plan:"ja"});save();render();};
@@ -601,7 +613,7 @@ $("demoBtn").onclick=()=>{S=demo();save();render();toast("Beispieldaten geladen"
 
 const MEN=[];
 const TEAM=[];
-function team(){const s=defaults();s.emps=TEAM.map(([n,w,o])=>Object.assign({id:uid(),name:n,weekly:w,zu:w===38.5?9:0,male:MEN.includes(n),onlyFd:false,nights:true,plan:"ja"},o||{}));s.menSet=true;s.fixSet=true;return s;}
+function team(){const s=defaults();s.emps=TEAM.map(([n,w,o])=>Object.assign({id:uid(),name:n,weekly:w,zu:w===38.5?9:0,male:MEN.includes(n),onlyFd:false,nights:true,plan:"ja"},o||{}));s.menSet=true;s.fixSet=true;s.hoursSet=true;return s;}
 
 // Beispieldaten (erfunden)
 function demo(){
